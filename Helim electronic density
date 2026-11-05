@@ -1,0 +1,181 @@
+
+#!/usr/bin/env python
+"""Hartree-Fock program for He atom."""
+
+import numpy as np
+from scipy.linalg import eigh
+import matplotlib.pyplot as plt
+
+
+def CmpOverlap(base):
+    """Calculate overlap O(a,b) = (pi/(a+b))^(3/2)."""
+    n = len(base)
+    Olap = np.zeros((n, n), dtype=float)
+
+    for i, ai in enumerate(base):
+        for j, bj in enumerate(base):
+            Olap[i, j] = (np.pi / (ai + bj)) ** 1.5
+
+    return Olap
+
+
+def CmpHam0(base):
+    """
+    Calculate one-electron Hamiltonian matrix.
+
+    K(a,b) = 3*a*b/(a+b) * (pi/(a+b))^(3/2)
+    V(a,b) = -4*pi/(a+b)
+    """
+    n = len(base)
+    Ham = np.zeros((n, n), dtype=float)
+
+    for i, ai in enumerate(base):
+        for j, bj in enumerate(base):
+            ab = ai + bj
+
+            # kinetic energy
+            Ham[i, j] = (
+                3.0 * ai * bj / ab
+                * (np.pi / ab) ** 1.5
+            )
+
+            # nuclear attraction, Z = 2
+            Ham[i, j] += -4.0 * np.pi / ab
+
+    return Ham
+
+
+def CmpU(base):
+    """
+    Coulomb integral
+
+    U_abcd =
+        2*pi^(5/2) /
+        ((a+c)(b+d)*sqrt(a+b+c+d))
+    """
+    n = len(base)
+    Uc = np.zeros((n, n, n, n), dtype=float)
+
+    cp = 2.0 * np.pi ** 2.5
+
+    for i, ai in enumerate(base):
+        for j, bj in enumerate(base):
+            for k, ck in enumerate(base):
+                for l, dl in enumerate(base):
+                    b1 = ai + ck
+                    b2 = bj + dl
+
+                    Uc[i, j, k, l] = (
+                        cp / (b1 * b2 * np.sqrt(b1 + b2))
+                    )
+
+    return Uc
+
+
+def CmpHeffHartree(Ham, Uc, rho):
+    """Compute the effective Hartree Hamiltonian."""
+    n = Ham.shape[0]
+    Heff = np.zeros_like(Ham)
+
+    for i in range(n):
+        for j in range(n):
+            hartree = 0.0
+
+            for k in range(n):
+                for l in range(n):
+                    hartree += Uc[k, i, l, j] * rho[k, l]
+
+            Heff[i, j] = Ham[i, j] + hartree
+
+    return Heff
+
+
+def Eigensystem(Olap, Heff):
+    """Solve the symmetric generalized eigenvalue problem."""
+    w, Z = eigh(Heff, Olap)
+    return w, Z
+
+
+def TotEnergy(w, rho, Ham):
+    """
+    Total energy for the present two-electron Hartree formulation.
+
+    With rho = C C^T, E = epsilon + <C|h|C>.
+    """
+    return w[0] + np.sum(rho * Ham)
+
+
+def CmpDensityM(C):
+    """Compute the one-orbital density matrix."""
+    return np.outer(C, C)
+
+
+def RadialDensity(r, rho, base):
+    """Calculate the radial orbital density n(r)."""
+    density = 0.0
+
+    for i, ai in enumerate(base):
+        for j, bj in enumerate(base):
+            density += (
+                rho[i, j]
+                * np.exp(-(ai + bj) * r * r)
+            )
+
+    return density
+
+
+if __name__ == '__main__':
+
+    base = [0.298073, 1.242567, 5.782948, 38.47497]
+
+    nmax = 100
+
+    Olap = CmpOverlap(base)
+    Ham = CmpHam0(base)
+    Uc = CmpU(base)
+
+    rho = np.zeros_like(Ham)
+
+    En = 0.0
+
+    for iteration in range(nmax):
+
+        Heff = CmpHeffHartree(Ham, Uc, rho)
+
+        w, Z = Eigensystem(Olap, Heff)
+
+        total_energy = TotEnergy(w, rho, Ham)
+
+        # FIXED: w[0] is a scalar, so don't use *
+        print(
+            f"Iteration {iteration + 1:3d}: "
+            f"epsilon = {w[0]: .10f}, "
+            f"E = {total_energy: .10f}"
+        )
+
+        rho_new = CmpDensityM(Z[:, 0])
+
+        if abs(En - w[0]) < 1e-6:
+            rho = rho_new
+            break
+
+        rho = rho_new
+        En = w[0]
+
+    # Radial grid
+    R = np.arange(1e-3, 3.5, 0.01)
+
+    # Factor 2 because He has two electrons
+    dens = [
+        2.0 * 4.0 * np.pi * r**2
+        * RadialDensity(r, rho, base)
+        for r in R
+    ]
+
+    plt.title('Electronic density for He atom')
+    plt.plot(R, dens, label=r'$4\pi r^2 n(r)$')
+    plt.xlabel(r'$r$')
+    plt.ylabel(r'$4\pi r^2 n(r)$')
+    plt.legend(loc='best')
+    plt.tight_layout()
+    plt.show()

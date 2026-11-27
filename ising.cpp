@@ -1,6 +1,6 @@
-/* Here’s a self-contained C++20 reference program implementing both algorithms for the zero-field, ferromagnetic 2D Ising model with periodic boundaries. It prints CSV measurements for each method. For Wolff, one reported “sweep” means cluster updates continue until at least N = L^2 spins have been flipped; this is a convention, not the same work as one Metropolis sweep. */
+/* Here’s a self-contained C++20 reference program implementing both algorithms for the zero-field, ferromagnetic 2D Ising model with periodic boundaries. It prints CSV measurements for each method. For Wolff, one reported “sweep” means cluster updates continue until at least N = $L^2$ spins have been flipped; this is a convention, not the same work as one Metropolis sweep. */
 
-/* Compile and run near criticality with J = $k_{\mathrm B}, so $\beta_c$ $\approx$ 0.4406868: 
+/* Compile and run near criticality with J = $k_{\mathrm B}$, so $\beta_c$ $\approx$ 0.4406868: 
 g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic ising.cpp -o ising
 ./ising 32 0.4406868 1000 5000 12345 > measurements.csv */
 
